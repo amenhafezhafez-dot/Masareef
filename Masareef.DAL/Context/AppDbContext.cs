@@ -36,6 +36,8 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
 
+    public virtual DbSet<AuditLog> AuditLogs { get; set; }
+
     public virtual DbSet<VwDebtSummary> VwDebtSummaries { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -147,6 +149,14 @@ public partial class AppDbContext : DbContext
             entity.HasOne(d => d.User).WithMany()
                 .HasForeignKey(d => d.UserId)
                 .HasConstraintName("FK_RefreshTokens_Users");
+        });
+
+        modelBuilder.Entity<AuditLog>(entity =>
+        {
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.Success).HasDefaultValue(true);
+            entity.HasIndex(e => e.UserId).HasDatabaseName("IX_AuditLogs_UserID");
+            entity.HasIndex(e => e.Action).HasDatabaseName("IX_AuditLogs_Action");
         });
 
 

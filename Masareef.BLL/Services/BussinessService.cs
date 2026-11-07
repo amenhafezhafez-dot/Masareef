@@ -2,14 +2,20 @@
 using Masareef.Entities.Common;
 using Masareef.Entities.DTOs;
 using Masareef.Entities.Models;
+using Microsoft.Extensions.Logging;
 
 namespace Masareef.BusinessLayer.Services;
 
 public class BusinessService
 {
     private readonly IBusinessRepository _repo;
+    private readonly ILogger<BusinessService> _logger;
 
-    public BusinessService(IBusinessRepository repo) => _repo = repo;
+    public BusinessService(IBusinessRepository repo, ILogger<BusinessService> logger)
+    {
+        _repo = repo;
+        _logger = logger;
+    }
 
 
     // ═══════════════════ المحلات — قراءة ═══════════════════
@@ -191,6 +197,9 @@ public class BusinessService
         if (!business.IsActive)
             return Result.Fail("This business is already deactivated.");
 
+        _logger.LogWarning("Business {BusinessId} deactivated by user {UserId}",
+            businessId, userId);
+
         bool ok = await _repo.DeactivateBusinessAsync(businessId, userId);
 
         return ok ? Result.Ok() : Result.Fail("Deactivation failed.");
@@ -209,6 +218,9 @@ public class BusinessService
 
         if (business.IsActive)
             return Result.Fail("This business is already active.");
+
+        _logger.LogInformation("Business {BusinessId} reactivated by user {UserId}",
+            businessId, userId);
 
         bool ok = await _repo.ReactivateBusinessAsync(businessId, userId);
 

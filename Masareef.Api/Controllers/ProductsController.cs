@@ -8,7 +8,13 @@ namespace Masareef.Api.Controllers;
 public class ProductsController : ApiControllerBase
 {
     private readonly ProductService _service;
-    public ProductsController(ProductService service) => _service = service;
+    private readonly AuditService _audit;
+
+    public ProductsController(ProductService service, AuditService audit)
+    {
+        _service = service;
+        _audit = audit;
+    }
 
 
     // ═══════════════════ المنتجات — قراءة ═══════════════════
@@ -97,8 +103,15 @@ public class ProductsController : ApiControllerBase
 
     /// <summary>تعطيل — سجل المبيعات يفضل محفوظ</summary>
     [HttpDelete("products/{id:int}")]
-    public async Task<IActionResult> Deactivate(int id) =>
-        FromResult(await _service.DeactivateAsync(id, CurrentUserId));
+    public async Task<IActionResult> Deactivate(int id)
+    {
+        var r = await _service.DeactivateAsync(id, CurrentUserId);
+
+        await _audit.LogAsync(CurrentUserId, "Product.Deactivate", "Product", id,
+            success: r.Success);
+
+        return FromResult(r);
+    }
 
 
     [HttpPost("products/{id:int}/reactivate")]
@@ -155,6 +168,13 @@ public class ProductsController : ApiControllerBase
 
     /// <summary>⭐ حذف بيعة — بيرجّع الكمية للمخزون</summary>
     [HttpDelete("sales/{saleId:int}")]
-    public async Task<IActionResult> DeleteSale(int saleId) =>
-        FromResult(await _service.DeleteSaleAsync(saleId, CurrentUserId));
+    public async Task<IActionResult> DeleteSale(int saleId)
+    {
+        var r = await _service.DeleteSaleAsync(saleId, CurrentUserId);
+
+        await _audit.LogAsync(CurrentUserId, "ProductSale.Delete", "ProductSale", saleId,
+            success: r.Success);
+
+        return FromResult(r);
+    }
 }

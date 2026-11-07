@@ -4,14 +4,20 @@ using Masareef.Entities.DTOs;
 using Masareef.Entities.Models;
 using Masareef.MasareefEntities.DTOs;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Masareef.BusinessLayer.Services;
 
 public class DebtService
 {
     private readonly IDebtRepository _repo;
+    private readonly ILogger<DebtService> _logger;
 
-    public DebtService(IDebtRepository repo) => _repo = repo;
+    public DebtService(IDebtRepository repo, ILogger<DebtService> logger)
+    {
+        _repo = repo;
+        _logger = logger;
+    }
 
 
     /// <summary>
@@ -252,6 +258,9 @@ public class DebtService
 
     public async Task<Result> WriteOffAsync(int debtId, int userId, string reason)
     {
+        _logger.LogWarning("Debt {DebtId} write-off requested by user {UserId}, reason: {Reason}",
+            debtId, userId, reason);
+
         var debt = await _repo.GetDeptByIdAsync(debtId, userId);
 
         if (debt is null)
@@ -267,6 +276,9 @@ public class DebtService
             return Result.Fail("A reason is required.");
 
         bool ok = await _repo.WriteOffAsync(debtId, reason.Trim());
+
+        if (!ok)
+            _logger.LogError("Debt {DebtId} write-off failed at repository level", debtId);
 
         return ok ? Result.Ok() : Result.Fail("Write-off failed.");
     }

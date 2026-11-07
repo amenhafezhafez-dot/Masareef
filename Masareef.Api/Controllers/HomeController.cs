@@ -8,7 +8,13 @@ namespace Masareef.Api.Controllers;
 public class HomeController : ApiControllerBase
 {
     private readonly HomeService _service;
-    public HomeController(HomeService service) => _service = service;
+    private readonly AuditService _audit;
+
+    public HomeController(HomeService service, AuditService audit)
+    {
+        _service = service;
+        _audit = audit;
+    }
 
 
     // ═══════════════════ المصاريف — قراءة ═══════════════════
@@ -76,8 +82,15 @@ public class HomeController : ApiControllerBase
 
 
     [HttpDelete("expenses/{id:int}")]
-    public async Task<IActionResult> DeleteExpense(int id) =>
-        FromResult(await _service.DeleteExpenseAsync(id, CurrentUserId));
+    public async Task<IActionResult> DeleteExpense(int id)
+    {
+        var r = await _service.DeleteExpenseAsync(id, CurrentUserId);
+
+        await _audit.LogAsync(CurrentUserId, "HomeExpense.Delete", "HomeExpense", id,
+            success: r.Success);
+
+        return FromResult(r);
+    }
 
 
     // ═══════════════════ الدخل — قراءة ═══════════════════
@@ -141,8 +154,15 @@ public class HomeController : ApiControllerBase
 
 
     [HttpDelete("incomes/{id:int}")]
-    public async Task<IActionResult> DeleteIncome(int id) =>
-        FromResult(await _service.DeleteIncomeAsync(id, CurrentUserId));
+    public async Task<IActionResult> DeleteIncome(int id)
+    {
+        var r = await _service.DeleteIncomeAsync(id, CurrentUserId);
+
+        await _audit.LogAsync(CurrentUserId, "HomeIncome.Delete", "HomeIncome", id,
+            success: r.Success);
+
+        return FromResult(r);
+    }
 }
 
 

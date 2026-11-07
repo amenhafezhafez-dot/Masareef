@@ -1,5 +1,6 @@
 ﻿using Masareef.BusinessLayer.Services;
 using Masareef.Entities.DTOs;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Masareef.Api.Controllers;
@@ -8,25 +9,34 @@ namespace Masareef.Api.Controllers;
 public class BusinessesController : ApiControllerBase
 {
     private readonly BusinessService _service;
-    public BusinessesController(BusinessService service) => _service = service;
+    private readonly AuditService _audit;
+
+    public BusinessesController(BusinessService service, AuditService audit)
+    {
+        _service = service;
+        _audit = audit;
+    }
 
 
     // ═══════════════════ المحلات — قراءة ═══════════════════
 
     /// <summary>المحلات النشطة</summary>
     [HttpGet]
+    //[Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> GetAll(CancellationToken ct) =>
         FromResult(await _service.GetAllAsync(CurrentUserId, ct));
 
 
     /// <summary>محل واحد بالتفصيل</summary>
     [HttpGet("{id:int}")]
+    [Authorize(Policy = "ResourceOwner")]
     public async Task<IActionResult> GetById(int id, CancellationToken ct) =>
         FromResult(await _service.GetByIdAsync(id, CurrentUserId, ct));
 
 
     /// <summary>المحلات المعطّلة</summary>
     [HttpGet("inactive")]
+
     public async Task<IActionResult> GetInactive(CancellationToken ct) =>
         FromResult(await _service.GetInactiveAsync(CurrentUserId, ct));
 
@@ -95,14 +105,28 @@ public class BusinessesController : ApiControllerBase
 
     /// <summary>تعطيل — التاريخ المالي يفضل محفوظ</summary>
     [HttpDelete("{id:int}")]
-    public async Task<IActionResult> Deactivate(int id) =>
-        FromResult(await _service.DeactivateAsync(id, CurrentUserId));
+    public async Task<IActionResult> Deactivate(int id)
+    {
+        var r = await _service.DeactivateAsync(id, CurrentUserId);
+
+        await _audit.LogAsync(CurrentUserId, "Business.Deactivate", "Business", id,
+            success: r.Success);
+
+        return FromResult(r);
+    }
 
 
     /// <summary>إعادة تفعيل محل معطّل</summary>
     [HttpPost("{id:int}/reactivate")]
-    public async Task<IActionResult> Reactivate(int id) =>
-        FromResult(await _service.ReactivateAsync(id, CurrentUserId));
+    public async Task<IActionResult> Reactivate(int id)
+    {
+        var r = await _service.ReactivateAsync(id, CurrentUserId);
+
+        await _audit.LogAsync(CurrentUserId, "Business.Reactivate", "Business", id,
+            success: r.Success);
+
+        return FromResult(r);
+    }
 
 
     // ═══════════════════ المصاريف ═══════════════════
@@ -145,8 +169,15 @@ public class BusinessesController : ApiControllerBase
 
 
     [HttpDelete("expenses/{expenseId:int}")]
-    public async Task<IActionResult> DeleteExpense(int expenseId) =>
-        FromResult(await _service.DeleteExpenseAsync(expenseId, CurrentUserId));
+    public async Task<IActionResult> DeleteExpense(int expenseId)
+    {
+        var r = await _service.DeleteExpenseAsync(expenseId, CurrentUserId);
+
+        await _audit.LogAsync(CurrentUserId, "BusinessExpense.Delete", "BusinessExpense",
+            expenseId, success: r.Success);
+
+        return FromResult(r);
+    }
 
 
     // ═══════════════════ الدخل ═══════════════════
@@ -188,8 +219,15 @@ public class BusinessesController : ApiControllerBase
 
 
     [HttpDelete("incomes/{incomeId:int}")]
-    public async Task<IActionResult> DeleteIncome(int incomeId) =>
-        FromResult(await _service.DeleteIncomeAsync(incomeId, CurrentUserId));
+    public async Task<IActionResult> DeleteIncome(int incomeId)
+    {
+        var r = await _service.DeleteIncomeAsync(incomeId, CurrentUserId);
+
+        await _audit.LogAsync(CurrentUserId, "BusinessIncome.Delete", "BusinessIncome",
+            incomeId, success: r.Success);
+
+        return FromResult(r);
+    }
 }
 
 

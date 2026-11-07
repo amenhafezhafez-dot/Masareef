@@ -8,9 +8,18 @@ using Microsoft.AspNetCore.RateLimiting;                       // ← جديد
 using System.Threading.RateLimiting;                           // ← جديد
 using Masareef.Api.Authorization;                              // ← جديد
 using Microsoft.IdentityModel.Tokens;                          // ← جديد
+using Serilog;                                                 // ← جديد
 using System.Text;                                             // ← جديد
 
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .WriteTo.File("Logs/log-.txt", rollingInterval: RollingInterval.Day)
+    .CreateLogger();
+
 var builder = WebApplication.CreateBuilder(args);
+builder.Host.UseSerilog();   // ← بيستبدل الـ logging الافتراضي بالكامل
 
 // ─────────── DbContext ───────────
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -24,6 +33,7 @@ builder.Services.AddScoped<IReportRepository, ReportRepository>();
 builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();           // ← جديد
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();   // ← جديد (refresh token)
+builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();           // ← جديد (auditing)
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 
 
@@ -37,6 +47,10 @@ builder.Services.AddScoped<CategoryService>();
 builder.Services.AddScoped<AuthService>();                              // ← جديد
 builder.Services.AddScoped<TokenService>();                             // ← جديد
 builder.Services.AddScoped<ProductService>();
+builder.Services.AddScoped<AuditService>();            // ← جديد (auditing)
+
+// الـ AuditService محتاجه عشان يقرا الـ IP بتاع الطلب
+builder.Services.AddHttpContextAccessor();
 
 // ─────────── JWT Authentication ───────────                          // ← كل البلوك ده جديد
 var jwt = builder.Configuration.GetSection("Jwt");
@@ -131,6 +145,8 @@ builder.Services.AddSwaggerGen(c =>
 //    c.SwaggerDoc("v1", new() { Title = "Masareef API", Version = "v1" }));
 
 var app = builder.Build();
+
+app.UseSerilogRequestLogging();   // بيسجّل كل request تلقائيًا: method, path, status code, المدة
 
 if (app.Environment.IsDevelopment())
 {

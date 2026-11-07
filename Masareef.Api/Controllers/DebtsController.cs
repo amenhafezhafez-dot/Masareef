@@ -10,12 +10,20 @@ namespace Masareef.Api.Controllers;
 public class DebtsController : ApiControllerBase
 {
     private readonly DebtService _service;
+    private readonly AuditService _audit;
     private readonly IAuthorizationService _authz;
+    private readonly ILogger<DebtsController> _logger;
 
-    public DebtsController(DebtService service, IAuthorizationService authz)
+    public DebtsController(
+        DebtService service,
+        AuditService audit,
+        IAuthorizationService authz,
+        ILogger<DebtsController> logger)
     {
         _service = service;
+        _audit = audit;
         _authz = authz;
+        _logger = logger;
     }
 
 
@@ -156,10 +164,24 @@ public class DebtsController : ApiControllerBase
 
         var auth = await _authz.AuthorizeAsync(User, debt, "ResourceOwner");
         if (!auth.Succeeded)
+        {
+            _logger.LogWarning(
+                "Ownership denied: user {UserId} tried to write off debt {DebtId} owned by {OwnerId}",
+                CurrentUserId, id, debt.UserId);
+
+            await _audit.LogAsync(CurrentUserId, "Debt.WriteOffDenied", "Debt", id,
+                details: $"owner={debt.UserId}", success: false);
+
             // NotFound مش Forbid — عشان منأكدش للمهاجم إن الدين ده موجود فعلاً
             return NotFound(new { error = "Debt not found." });
+        }
 
-        return FromResult(await _service.WriteOffAsync(id, CurrentUserId, req.Reason));
+        var r = await _service.WriteOffAsync(id, CurrentUserId, req.Reason);
+
+        await _audit.LogAsync(CurrentUserId, "Debt.WriteOff", "Debt", id,
+            details: req.Reason, success: r.Success);
+
+        return FromResult(r);
     }
 }
 

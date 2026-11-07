@@ -1,7 +1,8 @@
-﻿using Masareef.DAL.Repository;
+using Masareef.DAL.Repository;
 using Masareef.Entities.Common;
 using Masareef.Entities.DTOs;
 using Masareef.Entities.Models;
+using Microsoft.Extensions.Logging;
 
 namespace Masareef.BusinessLayer.Services;
 
@@ -17,12 +18,21 @@ public class AuthService
     private readonly IUserRepository _repo;
     private readonly IRefreshTokenRepository _refreshTokens;
     private readonly TokenService _tokens;
+    private readonly AuditService _audit;
+    private readonly ILogger<AuthService> _logger;
 
-    public AuthService(IUserRepository repo, IRefreshTokenRepository refreshTokens, TokenService tokens)
+    public AuthService(
+        IUserRepository repo,
+        IRefreshTokenRepository refreshTokens,
+        TokenService tokens,
+        AuditService audit,
+        ILogger<AuthService> logger)
     {
         _repo = repo;
         _refreshTokens = refreshTokens;
         _tokens = tokens;
+        _audit = audit;
+        _logger = logger;
     }
 
 
@@ -60,6 +70,9 @@ public class AuthService
         int newId = await _repo.AddUserAsync(user);
         user.UserId = newId;
 
+        _logger.LogInformation("New user registered: {UserId}", newId);
+        await _audit.LogAsync(newId, "Auth.Register", "User", newId);
+
         // نولّد توكنات على طول عشان المستخدم يدخل بعد التسجيل مباشرة
         return Result<AuthTokens>.Ok(await BuildTokensAsync(user));
     }
@@ -72,14 +85,29 @@ public class AuthService
         if (string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.Password))
             return Result<AuthTokens>.Fail("Email and password are required.");
 
-        var user = await _repo.GetByEmailAsync(dto.Email.Trim().ToLowerInvariant());
+        var email = dto.Email.Trim().ToLowerInvariant();
+        var user = await _repo.GetByEmailAsync(email);
 
         // نفس الرسالة سواء الإيميل غلط أو الباسورد غلط
         if (user is null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
+        {
+            _logger.LogWarning("Failed login attempt for {Email}", email);
+            await _audit.LogAsync(user?.UserId, "Auth.LoginFailed", "User", user?.UserId,
+                details: $"email={email}", success: false);
+
             return Result<AuthTokens>.Fail("Invalid email or password.");
+        }
 
         if (!user.IsActive)
+        {
+            await _audit.LogAsync(user.UserId, "Auth.LoginBlocked", "User", user.UserId,
+                details: "account disabled", success: false);
+
             return Result<AuthTokens>.Fail("This account is disabled.");
+        }
+
+        _logger.LogInformation("User {UserId} logged in", user.UserId);
+        await _audit.LogAsync(user.UserId, "Auth.LoginSucceeded", "User", user.UserId);
 
         return Result<AuthTokens>.Ok(await BuildTokensAsync(user));
     }
@@ -96,7 +124,20 @@ public class AuthService
         var stored = await _refreshTokens.GetByHashAsync(hash);
 
         if (stored is null || !stored.IsActive)
+        {
+            // التوكن ملغي بس لسه بيتستخدم = علامة محتملة على سرقته
+            if (stored?.RevokedAt is not null)
+            {
+                _logger.LogWarning(
+                    "Revoked refresh token reused for user {UserId} — possible token theft",
+                    stored.UserId);
+
+                await _audit.LogAsync(stored.UserId, "Auth.RefreshTokenReuse", "RefreshToken",
+                    stored.Id, details: "revoked token reused", success: false);
+            }
+
             return Result<AuthTokens>.Fail("Invalid or expired refresh token.");
+        }
 
         var user = await _repo.GetByIdAsync(stored.UserId);
         if (user is null || !user.IsActive)
@@ -121,7 +162,12 @@ public class AuthService
         var stored = await _refreshTokens.GetByHashAsync(hash);
 
         if (stored is not null && stored.RevokedAt is null)
+        {
             await _refreshTokens.RevokeAsync(stored);
+
+            _logger.LogInformation("User {UserId} logged out", stored.UserId);
+            await _audit.LogAsync(stored.UserId, "Auth.Logout", "User", stored.UserId);
+        }
     }
 
 

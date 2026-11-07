@@ -7,7 +7,13 @@ namespace Masareef.Api.Controllers;
 public class CategoriesController : ApiControllerBase
 {
     private readonly CategoryService _service;
-    public CategoriesController(CategoryService service) => _service = service;
+    private readonly AuditService _audit;
+
+    public CategoriesController(CategoryService service, AuditService audit)
+    {
+        _service = service;
+        _audit = audit;
+    }
 
 
     // ═══════════════════ قراءة ═══════════════════
@@ -74,8 +80,15 @@ public class CategoriesController : ApiControllerBase
 
     /// <summary>حذف تصنيف — يُرفض لو مستخدم في أي عملية</summary>
     [HttpDelete("{id:int}")]
-    public async Task<IActionResult> Delete(int id) =>
-        FromResult(await _service.DeleteAsync(id, CurrentUserId));
+    public async Task<IActionResult> Delete(int id)
+    {
+        var r = await _service.DeleteAsync(id, CurrentUserId);
+
+        await _audit.LogAsync(CurrentUserId, "Category.Delete", "Category", id,
+            success: r.Success);
+
+        return FromResult(r);
+    }
 }
 
 
