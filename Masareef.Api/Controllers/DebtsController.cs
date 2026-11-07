@@ -1,6 +1,7 @@
 ﻿using Masareef.BusinessLayer.Services;
 using Masareef.Entities.DTOs;
 using Masareef.MasareefEntities.DTOs;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Masareef.Api.Controllers;
@@ -9,7 +10,13 @@ namespace Masareef.Api.Controllers;
 public class DebtsController : ApiControllerBase
 {
     private readonly DebtService _service;
-    public DebtsController(DebtService service) => _service = service;
+    private readonly IAuthorizationService _authz;
+
+    public DebtsController(DebtService service, IAuthorizationService authz)
+    {
+        _service = service;
+        _authz = authz;
+    }
 
 
 
@@ -139,8 +146,21 @@ public class DebtsController : ApiControllerBase
 
     /// <summary>شطب الدين — بيتسجّل السبب ومينفعش يترجع</summary>
     [HttpPost("{id:int}/write-off")]
-    public async Task<IActionResult> WriteOff(int id, [FromBody] WriteOffRequest req) =>
-        FromResult(await _service.WriteOffAsync(id, CurrentUserId, req.Reason));
+    public async Task<IActionResult> WriteOff(int id, [FromBody] WriteOffRequest req)
+    {
+        // العملية دي لا ترجع، والـ repository بينفذها من غير ما يتحقق من المالك —
+        // فالـ ResourceOwner policy هي البوابة الصريحة اللي بتحرسها.
+        var debt = await _service.GetForOwnershipCheckAsync(id);
+        if (debt is null)
+            return NotFound(new { error = "Debt not found." });
+
+        var auth = await _authz.AuthorizeAsync(User, debt, "ResourceOwner");
+        if (!auth.Succeeded)
+            // NotFound مش Forbid — عشان منأكدش للمهاجم إن الدين ده موجود فعلاً
+            return NotFound(new { error = "Debt not found." });
+
+        return FromResult(await _service.WriteOffAsync(id, CurrentUserId, req.Reason));
+    }
 }
 
 public record WriteOffRequest(string Reason);

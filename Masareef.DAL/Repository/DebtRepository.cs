@@ -72,6 +72,11 @@ public class DebtRepository : IDebtRepository
             .Include(d => d.DebtPayments)
             .FirstOrDefaultAsync(d => d.DebtId == debtId && d.UserId == userId);
 
+    public async Task<Debt?> GetByIdForOwnershipCheckAsync(int debtId) =>
+        await _context.Debts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(d => d.DebtId == debtId);
+
     public async Task<int> AddDeptPaymentAsync(DebtPayment payment)
     {
         _context.DebtPayments.Add(payment);

@@ -14,6 +14,14 @@ public class DebtService
     public DebtService(IDebtRepository repo) => _repo = repo;
 
 
+    /// <summary>
+    /// بيرجّع الدين من غير فلترة بالمالك — عشان الـ OwnershipRequirementHandler
+    /// هو اللي يتحقق من الملكية. مخصص لعمليات الحذف/الشطب الحساسة بس.
+    /// </summary>
+    public Task<Debt?> GetForOwnershipCheckAsync(int debtId) =>
+        _repo.GetByIdForOwnershipCheckAsync(debtId);
+
+
     public async Task<Result<Debt>> GetDeptByIdAsync(int debtId, int userId)
     {
         if (userId <= 0)

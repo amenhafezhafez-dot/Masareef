@@ -63,11 +63,15 @@ builder.Services.AddCors(o => o.AddPolicy("spa", p => p
 
 // ─────────── Authorization ───────────
 builder.Services.AddSingleton<IAuthorizationHandler, AdminRequirementHandler>();
+builder.Services.AddSingleton<IAuthorizationHandler, OwnershipRequirementHandler>();
 
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("AdminOnly", policy =>
         policy.Requirements.Add(new AdminRequirement()));
+
+    options.AddPolicy("ResourceOwner", policy =>
+        policy.Requirements.Add(new OwnershipRequirement()));
 });
 
 builder.Services.AddControllers();

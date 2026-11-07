@@ -9,6 +9,12 @@ public interface IDebtRepository
     Task<List<DebtSummaryDto>> SearchAsync(int userId, DebtFilterDto filter);
 
     Task<Debt?> GetDeptByIdAsync(int debtId, int userId);
+
+    /// <summary>
+    /// بيجيب الدين بالـ ID بس من غير فلترة بالمالك — مخصص للحالات اللي الـ
+    /// OwnershipRequirementHandler هو اللي بيتحقق من الملكية فيها. متستخدمهاش في أي حتة تانية.
+    /// </summary>
+    Task<Debt?> GetByIdForOwnershipCheckAsync(int debtId);
     Task<DebtDetailsDto?> GetDetailsAsync(int debtId, int userId);
     Task<DebtTotalsDto> GetTotalsAsync(int userId);
 
