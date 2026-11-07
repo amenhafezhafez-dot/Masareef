@@ -1,127 +1,210 @@
-# Masareef API
+# Masareef
 
-نظام إدارة مصاريف شخصية ومحلات تجارية — ASP.NET Core 8 بمعمارية طبقات
-(`Api` → `BLL` → `DAL` → `Entities`) مع SQL Server و React frontend.
+Personal and small-business expense tracking. Households track income,
+expenses and debts; shop owners additionally track products, sales and
+per-shop profit.
+
+ASP.NET Core 8 REST API in a layered architecture, SQL Server for storage,
+and a React single-page frontend.
+
+```
+Masareef.Api        HTTP layer — controllers, authorization policies, middleware
+Masareef.BLL        business rules and validation
+Masareef.DAL        EF Core DbContext and repositories
+Masareef.Entities   models, DTOs, shared types
+Masareef.Console    console client (separate from the API)
+masareef-frontend   React 18 + Vite SPA
+```
 
 ---
 
-## التشغيل خطوة بخطوة
+## Prerequisites
 
-### 1. الداتابيز
+| | |
+|---|---|
+| [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) | builds and runs the API |
+| SQL Server (Express is fine) | database |
+| [Node.js 18+](https://nodejs.org) | only if you want to run the frontend |
 
-شغّل سكريبت الـ schema الأساسي بتاع المشروع، وبعده **لازم**:
+---
+
+## Getting started
+
+### 1. Clone
 
 ```bash
-sqlcmd -S <server> -d MasareefDB -E -i Database/01_security_schema.sql
+git clone https://github.com/amenhafezhafez-dot/Masareef.git
+cd Masareef
 ```
 
-ده بيضيف اللي نظام الأمان محتاجه: عمود `Users.Role` وجدولي `RefreshTokens`
-و `AuditLogs`. السكريبت آمن لو اتشغّل أكتر من مرة، وفي آخره تحقق بيطبع
-`OK` لكل عنصر.
+### 2. Create the database
 
-> **لو مشغّلتهوش:** التطبيق هيقلع عادي، لكن **كل** تسجيل دخول هيفشل بـ 500
-> (`Invalid column name 'Role'`) وبالتالي التطبيق كله مش هينفع يستخدم.
+Create a database named `MasareefDB`, then apply the schema.
 
-### 2. المفتاح السري (Jwt:Key)
+> **⚠️ The base schema is not in this repository yet.**
+> `Database/01_security_schema.sql` only adds what the security layer needs.
+> It assumes the core tables (`Users`, `Debts`, `Businesses`, `Categories`,
+> `Products`, …) already exist, and will fail without them.
+> If you are setting up from scratch, you need the base schema first —
+> ask the maintainer for it.
 
-المفتاح **مش موجود في المشروع** ومش بيتنقل معاه. كل بيئة بتولّد مفتاحها الخاص.
+Once the core tables exist:
 
-ولّد مفتاح عشوائي:
+```bash
+sqlcmd -S .\SQLEXPRESS -d MasareefDB -E -i Database/01_security_schema.sql
+```
+
+This adds the `Users.Role` column and the `RefreshTokens` and `AuditLogs`
+tables. It is idempotent — running it twice changes nothing — and prints
+`OK` for each item at the end.
+
+Skipping it does not stop the app from starting. It makes **every login
+fail** with `Invalid column name 'Role'`, which makes the whole API
+unusable.
+
+### 3. Set the signing key
+
+The JWT signing key is not in the repository and does not travel with it.
+Every environment generates its own.
+
+Generate one:
 
 ```bash
 openssl rand -base64 48
 ```
 
-**للتطوير** (المفتاح بيتخزّن بره مجلد المشروع):
+**Development** — stored outside the project folder:
 
 ```bash
-dotnet user-secrets set "Jwt:Key" "<المفتاح>" --project Masareef.Api
+dotnet user-secrets set "Jwt:Key" "<your key>" --project Masareef.Api
 ```
 
-**للإنتاج** — environment variable:
+**Production** — set an environment variable:
 
-| الاستضافة | الطريقة |
+| Host | How |
 |---|---|
 | Azure App Service | Configuration → Application settings → `Jwt__Key` |
-| IIS / Windows Server | System Environment Variables، أو `web.config` → `environmentVariables` |
-| Linux + systemd | `Environment="Jwt__Key=..."` في ملف الـ service |
+| IIS / Windows Server | System environment variables, or `web.config` → `environmentVariables` |
+| Linux + systemd | `Environment="Jwt__Key=..."` in the unit file |
 | Docker | `docker run -e Jwt__Key="..."` |
 
-> `__` (شرطتين سفليتين) = `:` في مسار الإعدادات، لأن الـ environment variables
-> مابتقبلش `:` على كل أنظمة التشغيل.
+`__` (double underscore) maps to `:` in the configuration path, because
+environment variable names cannot contain a colon on every platform.
 
-⚠️ المفتاح لازم يفضل **ثابت**. تغييره يُبطل كل التوكنات الموجودة ويسجّل خروج
-كل المستخدمين فورًا.
+Two things worth knowing:
 
-⚠️ لو المفتاح ناقص أو أقل من 32 حرف، التطبيق **يرفض يقلع** برسالة واضحة —
-ده مقصود، أحسن من إنه يشتغل بأمان وهمي.
+- **Keep the key stable.** Changing it invalidates every issued token and
+  signs all users out immediately.
+- **The app refuses to start** if the key is missing or under 32
+  characters. That is deliberate — starting with a weak key would be worse
+  than not starting at all.
 
-### 3. باقي الإعدادات
+### 4. Configure the rest
 
-| الإعداد | التطوير | الإنتاج (environment variable) |
+| Setting | Development | Production (environment variable) |
 |---|---|---|
-| الداتابيز | `appsettings.Development.json` | `ConnectionStrings__DefaultConnection` |
-| دومين الفرونت إند | `appsettings.Development.json` | `Cors__Origins` |
-| المفتاح السري | User Secrets | `Jwt__Key` |
+| Database | `appsettings.Development.json` | `ConnectionStrings__DefaultConnection` |
+| Allowed frontend origins | `appsettings.Development.json` | `Cors__Origins` |
+| Signing key | User Secrets | `Jwt__Key` |
 
-الإعدادات الناقصة بتوقف التشغيل برسالة بتقول الناقص ايه بالظبط.
+Startup reports every missing setting at once, along with the environment
+it resolved and the configuration sources it searched.
 
-### 4. التشغيل
+### 5. Run the API
 
 ```bash
 dotnet run --project Masareef.Api --launch-profile https
 ```
 
-Swagger متاح في بيئة التطوير بس: `https://localhost:7146/swagger`
+Swagger UI is available in Development only, at
+`https://localhost:7146/swagger`.
+
+### 6. Run the frontend
+
+```bash
+cd masareef-frontend
+npm install
+npm run dev
+```
+
+Opens on `http://localhost:5173`. Vite proxies `/api/*` to
+`http://localhost:5238`, so the browser sees a single origin and no CORS
+configuration is needed while developing. If you run the API on a
+different port, update the proxy target in `vite.config.js`.
 
 ---
 
-## 🔴 HTTPS إلزامي في الإنتاج
+## ⚠️ HTTPS is required in production
 
-الـ refresh token بيتخزّن في كوكي عليها `Secure=true`، يعني **المتصفح مش
-هيبعتها أبدًا على HTTP عادي**. لو نشرت على HTTP:
+The refresh token lives in a cookie marked `Secure`, so **the browser will
+not send it over plain HTTP**. Deploying without TLS produces:
 
-- المتصفح يرفض الكوكي بصمت، من غير أي رسالة خطأ
-- `POST /api/auth/refresh` يرجّع 401 دايمًا
-- المستخدمين يتسجّل خروجهم **كل 15 دقيقة** (عند انتهاء الـ access token)
+- the cookie silently rejected, with no error anywhere
+- `POST /api/auth/refresh` always returning 401
+- users signed out every 15 minutes, when the access token expires
 
-وده هيبان كـ "بَج غامض" مش كخطأ إعداد. `localhost` استثناء (المتصفحات
-بتعتبره سياق آمن) وعشان كده التطوير المحلي بيشتغل على HTTP.
+This surfaces as a mysterious bug rather than a configuration error.
+`localhost` is exempt — browsers treat it as a secure context — which is
+why local development works over HTTP.
 
-**الخلاصة:** سيرفر الإنتاج لازم شهادة TLS حقيقية، والـ `Cors__Origins`
-لازم تبدأ بـ `https://`.
+In production: a real TLS certificate, and `Cors__Origins` values starting
+with `https://`.
 
 ---
 
-## نظرة على نظام الأمان
+## Security
 
-| الطبقة | التنفيذ |
+| Area | Implementation |
 |---|---|
-| **Authentication** | JWT موقّع بـ HMAC-SHA256، عمره 15 دقيقة. التحقق من Issuer/Audience/Lifetime/Signature |
-| **كلمات السر** | BCrypt (hash + salt تلقائي) |
-| **Authorization** | Policy-based: `AdminOnly` عبر `AdminRequirement` + Handler يقرا الـ Role claim |
-| **Ownership** | فلترة بالـ `userId` في كل استعلام، بالإضافة لـ `ResourceOwner` policy كبوابة صريحة على العمليات اللي لا ترجع (شطب الدين) |
-| **Refresh Token** | 7 أيام، HttpOnly + Secure cookie على `Path=/api/auth`. مخزّن كـ SHA-256 hash مش خام. **Rotation** في كل استخدام + كشف إعادة استخدام التوكنات الملغية |
-| **Logout** | إبطال فوري للـ refresh token في الداتابيز + مسح الكوكي |
-| **Rate limiting** | 5 طلبات/دقيقة لكل IP على كل `/api/auth/*` (حماية من brute force) |
-| **Logging** | Serilog → console + ملفات يومية في `Logs/` |
-| **Auditing** | جدول `AuditLogs` دائم: محاولات الدخول، الشطب، الحذف، محاولات انتهاك الملكية. فشل التسجيل مابيوقّفش العملية (بيتسجّل كـ error في الـ log) |
+| Authentication | JWT signed with HMAC-SHA256, 15-minute lifetime. Issuer, audience, lifetime and signature all validated |
+| Passwords | BCrypt, with a per-user salt |
+| Authorization | Policy-based. `AdminOnly` is a custom `IAuthorizationRequirement` plus handler reading the role claim, so the rule lives in one place |
+| Ownership | Every query filters by the authenticated user id. The `ResourceOwner` policy adds an explicit gate on irreversible operations — debt write-off, where the repository method itself takes no user id |
+| Refresh tokens | 7 days, in an HttpOnly + Secure cookie scoped to `/api/auth`. Stored as a SHA-256 hash, never raw. Rotated on every use, and reuse of a revoked token is recorded |
+| Logout | Revokes the token server-side rather than only clearing the cookie |
+| Rate limiting | 5 requests per minute per IP across `/api/auth/*` |
+| Logging | Serilog to console and daily rolling files under `Logs/` |
+| Auditing | `AuditLogs` table: logins, registrations, deletions, write-offs, deactivations, denied ownership attempts. A failed audit write is logged but never fails the request |
+| Secrets | Never committed. User Secrets in development, environment variables in production |
 
-### الأدوار
+### Roles
 
-- التسجيل من الـ API بينتج `Role = 'User'` **دايمًا** — مفيش طريقة لإنشاء Admin من بره.
-- ترقية مستخدم لـ Admin بتتم بـ SQL مباشر (شوف آخر السكريبت).
-- الـ Role جوه التوكن، فالمستخدم لازم يعمل login من جديد بعد ترقيته.
+Registration through the API always produces `Role = 'User'`. There is no
+API path that creates an administrator. Promotion is a deliberate database
+operation:
 
-### `/api/admin/audit`
+```sql
+UPDATE dbo.Users SET [Role] = 'Admin' WHERE Email = 'someone@example.com';
+```
 
-محمي بـ `AdminOnly`. بيرجّع آخر 200 حدث، بفلترة اختيارية:
-`?userId=12` أو `?action=Debt.WriteOffDenied`
+The role is carried inside the token, so the user must sign in again after
+being promoted.
 
 ---
 
-## ملفات مش بتترفع على git
+## API
 
-`.gitignore` بيستثني: `bin/`, `obj/`, `.vs/`, `node_modules/`, و **`Logs/`**
-(ملفات الـ log فيها إيميلات مستخدمين وبيانات طلبات). الأسرار مابتترفعش لأنها
-في User Secrets / environment variables من الأساس.
+| Route | Purpose |
+|---|---|
+| `POST /api/auth/register` `login` `refresh` `logout` | authentication, rate limited |
+| `/api/home/expenses` `incomes` | household income and expenses |
+| `/api/debts` | debts, payments, write-off |
+| `/api/businesses` | shops, their income and expenses, profit |
+| `/api/businesses/{id}/products`, `/api/products` | inventory and sales |
+| `/api/categories` | user and system categories |
+| `/api/reports` | dashboard, trends, breakdowns |
+| `/api/admin/audit` | audit trail — `AdminOnly` |
+
+All endpoints except `/api/auth/*` require `Authorization: Bearer <token>`.
+
+`/api/admin/audit` returns the 200 most recent events and accepts
+`?userId=` and `?action=` filters.
+
+---
+
+## Not committed
+
+`.gitignore` excludes build output (`bin/`, `obj/`), IDE state (`.vs/`),
+`node_modules/`, and **`Logs/`** — log files contain user email addresses
+and request data. Secrets are never in the repository to begin with; they
+live in User Secrets or environment variables.
