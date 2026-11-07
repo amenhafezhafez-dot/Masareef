@@ -13,7 +13,16 @@ public class AuthController : ControllerBase
     private const string RefreshCookieName = "refreshToken";
 
     private readonly AuthService _service;
-    public AuthController(AuthService service) => _service = service;
+    private readonly int _refreshTokenDays;
+
+    public AuthController(AuthService service, IConfiguration config)
+    {
+        _service = service;
+        _refreshTokenDays =
+            int.TryParse(config["Jwt:RefreshTokenExpiryDays"], out var d) ? d : 7;
+    }
+
+
 
     /// <summary>تسجيل مستخدم جديد</summary>
     [HttpPost("register")]
@@ -78,7 +87,7 @@ public class AuthController : ControllerBase
             Secure = true,                                 // يترسل بس فوق HTTPS
             SameSite = SameSiteMode.None,                  // الفرونت إند على origin مختلف (بورت مختلف)
             Path = "/api/auth",                            // تترسل بس لـ endpoints الـ auth، مش لكل الـ API
-            Expires = DateTimeOffset.UtcNow.AddDays(7)      // لازم يطابق Jwt:RefreshTokenExpiryDays
+            Expires = DateTimeOffset.UtcNow.AddDays(_refreshTokenDays)   // من الإعدادات، مش رقم ثابت
         });
     }
 
