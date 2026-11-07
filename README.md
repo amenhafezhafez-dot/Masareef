@@ -1,167 +1,127 @@
-# Masareef — Personal & Business Finance Management API
+# Masareef API
 
-A full-stack finance management system for tracking household expenses, small-business income and expenses, product inventory and sales, and debts with payment schedules. The **backend is the core of this project**: a layered ASP.NET Core Web API built with a focus on clean architecture, security, and query performance.
-
----
-
-## ✨ Highlights
-
-- **11 entities + 1 database view**, **~92 RESTful endpoints**, **38 DTOs**, and **19 targeted database indexes** (composite & filtered).
-- Layered architecture (**API → Business → Data Access**) with the **Repository** and **Service** patterns and **Dependency Injection** throughout.
-- **JWT authentication** with **BCrypt** password hashing and controller-level authorization.
-- **Performance-tuned EF Core**: N+1 elimination via SQL-side aggregation, DTO projection, `AsNoTracking()`, and optimistic concurrency (`rowversion`).
-- Interactive **Swagger / OpenAPI** documentation with JWT support.
+نظام إدارة مصاريف شخصية ومحلات تجارية — ASP.NET Core 8 بمعمارية طبقات
+(`Api` → `BLL` → `DAL` → `Entities`) مع SQL Server و React frontend.
 
 ---
 
-## 🛠️ Tech Stack
+## التشغيل خطوة بخطوة
 
-**Backend**
-- C# · .NET 8
-- ASP.NET Core Web API
-- Entity Framework Core (SQL Server)
-- JWT Bearer Authentication · BCrypt
-- Swagger / OpenAPI
+### 1. الداتابيز
 
-**Frontend**
-- React 18 · Vite · React Router · Recharts
-
-**Architecture & Patterns**
-- Layered / N-Tier Architecture
-- Repository Pattern · Service Layer Pattern
-- Dependency Injection · Result Pattern
-- SOLID principles (SRP, DIP)
-
----
-
-## 🏗️ Architecture
-
-```
-┌─────────────────┐
-│   API Layer     │  Controllers, JWT auth, HTTP mapping
-├─────────────────┤
-│  Business Layer │  Services, validation, business rules (Result<T>)
-├─────────────────┤
-│    Data Layer   │  Repositories, EF Core DbContext
-├─────────────────┤
-│    Entities     │  Domain models + DTOs
-└─────────────────┘
-```
-
-Each layer depends only on the abstraction (interface) of the layer below it, keeping controllers free of data-access code and business rules out of the persistence layer.
-
----
-
-## 🔑 Key Features
-
-- **Household finance** — track home income and expenses by category with filtering and search.
-- **Business management** — manage multiple businesses, each with its own income, expenses, products, and sales.
-- **Inventory & sales** — product stock, cost/selling price, and per-sale profit tracking with soft-delete for auditability.
-- **Debt management** — create debts, record payments, auto-update status, and write off debts with reasons.
-- **Reports & dashboard** — aggregated financial summaries computed at the database level.
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-- [.NET 8 SDK](https://dotnet.microsoft.com/download)
-- SQL Server (Express is fine)
-- Node.js 18+ (for the frontend)
-
-### Backend setup
+شغّل سكريبت الـ schema الأساسي بتاع المشروع، وبعده **لازم**:
 
 ```bash
-# 1. Clone the repo
-git clone https://github.com/<your-username>/masareef.git
-cd masareef
-
-# 2. Configure secrets (do NOT commit these — see note below)
-dotnet user-secrets init --project Masareef.Api
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=.\SQLEXPRESS;Database=MasareefDB;Trusted_Connection=True;TrustServerCertificate=True;" --project Masareef.Api
-dotnet user-secrets set "Jwt:Key" "<your-random-32+-char-secret>" --project Masareef.Api
-
-# 3. Apply the database (if migrations are included)
-dotnet ef database update --project Masareef.Api
-
-# 4. Run the API
-dotnet run --project Masareef.Api
+sqlcmd -S <server> -d MasareefDB -E -i Database/01_security_schema.sql
 ```
 
-The API and Swagger UI will be available at `https://localhost:<port>/swagger`.
+ده بيضيف اللي نظام الأمان محتاجه: عمود `Users.Role` وجدولي `RefreshTokens`
+و `AuditLogs`. السكريبت آمن لو اتشغّل أكتر من مرة، وفي آخره تحقق بيطبع
+`OK` لكل عنصر.
 
-### Frontend setup
+> **لو مشغّلتهوش:** التطبيق هيقلع عادي، لكن **كل** تسجيل دخول هيفشل بـ 500
+> (`Invalid column name 'Role'`) وبالتالي التطبيق كله مش هينفع يستخدم.
+
+### 2. المفتاح السري (Jwt:Key)
+
+المفتاح **مش موجود في المشروع** ومش بيتنقل معاه. كل بيئة بتولّد مفتاحها الخاص.
+
+ولّد مفتاح عشوائي:
 
 ```bash
-cd frontend
-npm install
-npm run dev
+openssl rand -base64 48
 ```
 
-> ⚠️ **Security note:** The JWT signing key and database connection string are **never committed** to source control. They are stored via .NET **User Secrets** in development and **environment variables** in production.
+**للتطوير** (المفتاح بيتخزّن بره مجلد المشروع):
 
----
+```bash
+dotnet user-secrets set "Jwt:Key" "<المفتاح>" --project Masareef.Api
+```
 
-## 📖 API Documentation
+**للإنتاج** — environment variable:
 
-Once running, open `/swagger` for interactive documentation. Protected endpoints require a JWT — log in via `POST /api/auth/login`, then click **Authorize** in Swagger and paste the token.
-
----
-
-## 🎨 A Note on the Frontend
-
-This project's focus and my contribution is the **backend** — the API, architecture, database design, and performance work described above. The **React frontend was not built by me**; it was added as a ready-made client to demonstrate the API end-to-end. All backend design decisions, code, and optimizations are my own work.
-
----
-
-## 📊 Project Stats
-
-| Metric | Count |
+| الاستضافة | الطريقة |
 |---|---|
-| Entities (tables) | 11 (+1 view) |
-| REST endpoints | ~92 |
-| Controllers | 7 |
-| Services | 8 |
-| Repositories | 7 |
-| DTOs | 38 |
-| Database indexes | 19 |
+| Azure App Service | Configuration → Application settings → `Jwt__Key` |
+| IIS / Windows Server | System Environment Variables، أو `web.config` → `environmentVariables` |
+| Linux + systemd | `Environment="Jwt__Key=..."` في ملف الـ service |
+| Docker | `docker run -e Jwt__Key="..."` |
 
+> `__` (شرطتين سفليتين) = `:` في مسار الإعدادات، لأن الـ environment variables
+> مابتقبلش `:` على كل أنظمة التشغيل.
 
-# مصاريف — الواجهة الأمامية (Frontend)
+⚠️ المفتاح لازم يفضل **ثابت**. تغييره يُبطل كل التوكنات الموجودة ويسجّل خروج
+كل المستخدمين فورًا.
 
-واجهة React عصرية لنظام مصاريف، مربوطة بالـ API بتاعك عبر JWT.
+⚠️ لو المفتاح ناقص أو أقل من 32 حرف، التطبيق **يرفض يقلع** برسالة واضحة —
+ده مقصود، أحسن من إنه يشتغل بأمان وهمي.
 
-## المتطلّبات
-- Node.js (النسخة 18 أو أحدث) — نزّله من https://nodejs.org
+### 3. باقي الإعدادات
 
-## التشغيل (٣ خطوات)
+| الإعداد | التطوير | الإنتاج (environment variable) |
+|---|---|---|
+| الداتابيز | `appsettings.Development.json` | `ConnectionStrings__DefaultConnection` |
+| دومين الفرونت إند | `appsettings.Development.json` | `Cors__Origins` |
+| المفتاح السري | User Secrets | `Jwt__Key` |
 
-1. افتح Terminal داخل مجلد `masareef-frontend` ونفّذ:
+الإعدادات الناقصة بتوقف التشغيل برسالة بتقول الناقص ايه بالظبط.
+
+### 4. التشغيل
+
+```bash
+dotnet run --project Masareef.Api --launch-profile https
 ```
-npm install
-```
-(بيحمّل المكتبات — مرة واحدة بس)
 
-2. شغّل الباكند بتاعك (مشروع Masareef.Api) على `http://localhost:5238`
+Swagger متاح في بيئة التطوير بس: `https://localhost:7146/swagger`
 
-3. شغّل الواجهة:
-```
-npm run dev
-```
+---
 
-هيفتح على `http://localhost:5173` — سجّل دخول بحساب موجود، أو اعمل حساب جديد.
+## 🔴 HTTPS إلزامي في الإنتاج
 
-## لو الباكند على بورت مختلف
-غيّر العنوان في ملف `vite.config.js` (السطر `target`).
+الـ refresh token بيتخزّن في كوكي عليها `Secure=true`، يعني **المتصفح مش
+هيبعتها أبدًا على HTTP عادي**. لو نشرت على HTTP:
 
-## الصفحات
-- **تسجيل الدخول / إنشاء حساب** — أول شاشة
-- **اللوحة** — نظرة عامة على الوضع المالي
-- **البيت** — المصاريف والدخل + إضافة
-- **البيزنس** — المحلات وأرباحها + إضافة
-- **الديون** — اللي عليك واللي ليك + دفعات + تفاصيل
-- **التقارير** — رسوم بيانية للإنفاق والاتجاه
+- المتصفح يرفض الكوكي بصمت، من غير أي رسالة خطأ
+- `POST /api/auth/refresh` يرجّع 401 دايمًا
+- المستخدمين يتسجّل خروجهم **كل 15 دقيقة** (عند انتهاء الـ access token)
 
-## ملاحظات
-- التوكن بيتخزّن في المتصفح، فمش هتحتاج تسجّل دخول كل مرة
-- لو الجلسة انتهت (بعد ساعتين)، بيرجّعك لصفحة الدخول تلقائياً
+وده هيبان كـ "بَج غامض" مش كخطأ إعداد. `localhost` استثناء (المتصفحات
+بتعتبره سياق آمن) وعشان كده التطوير المحلي بيشتغل على HTTP.
+
+**الخلاصة:** سيرفر الإنتاج لازم شهادة TLS حقيقية، والـ `Cors__Origins`
+لازم تبدأ بـ `https://`.
+
+---
+
+## نظرة على نظام الأمان
+
+| الطبقة | التنفيذ |
+|---|---|
+| **Authentication** | JWT موقّع بـ HMAC-SHA256، عمره 15 دقيقة. التحقق من Issuer/Audience/Lifetime/Signature |
+| **كلمات السر** | BCrypt (hash + salt تلقائي) |
+| **Authorization** | Policy-based: `AdminOnly` عبر `AdminRequirement` + Handler يقرا الـ Role claim |
+| **Ownership** | فلترة بالـ `userId` في كل استعلام، بالإضافة لـ `ResourceOwner` policy كبوابة صريحة على العمليات اللي لا ترجع (شطب الدين) |
+| **Refresh Token** | 7 أيام، HttpOnly + Secure cookie على `Path=/api/auth`. مخزّن كـ SHA-256 hash مش خام. **Rotation** في كل استخدام + كشف إعادة استخدام التوكنات الملغية |
+| **Logout** | إبطال فوري للـ refresh token في الداتابيز + مسح الكوكي |
+| **Rate limiting** | 5 طلبات/دقيقة لكل IP على كل `/api/auth/*` (حماية من brute force) |
+| **Logging** | Serilog → console + ملفات يومية في `Logs/` |
+| **Auditing** | جدول `AuditLogs` دائم: محاولات الدخول، الشطب، الحذف، محاولات انتهاك الملكية. فشل التسجيل مابيوقّفش العملية (بيتسجّل كـ error في الـ log) |
+
+### الأدوار
+
+- التسجيل من الـ API بينتج `Role = 'User'` **دايمًا** — مفيش طريقة لإنشاء Admin من بره.
+- ترقية مستخدم لـ Admin بتتم بـ SQL مباشر (شوف آخر السكريبت).
+- الـ Role جوه التوكن، فالمستخدم لازم يعمل login من جديد بعد ترقيته.
+
+### `/api/admin/audit`
+
+محمي بـ `AdminOnly`. بيرجّع آخر 200 حدث، بفلترة اختيارية:
+`?userId=12` أو `?action=Debt.WriteOffDenied`
+
+---
+
+## ملفات مش بتترفع على git
+
+`.gitignore` بيستثني: `bin/`, `obj/`, `.vs/`, `node_modules/`, و **`Logs/`**
+(ملفات الـ log فيها إيميلات مستخدمين وبيانات طلبات). الأسرار مابتترفعش لأنها
+في User Secrets / environment variables من الأساس.
