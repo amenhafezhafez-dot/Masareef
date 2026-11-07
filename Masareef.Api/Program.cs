@@ -21,6 +21,7 @@ builder.Services.AddScoped<IBusinessRepository, BusinessRepository>();
 builder.Services.AddScoped<IReportRepository, ReportRepository>();
 builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();           // ← جديد
+builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();   // ← جديد (refresh token)
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 
 
@@ -57,7 +58,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddCors(o => o.AddPolicy("spa", p => p
     .WithOrigins(builder.Configuration["Cors:Origins"]!.Split(','))
     .AllowAnyHeader()
-    .AllowAnyMethod()));
+    .AllowAnyMethod()
+    .AllowCredentials()));   // ← لازم عشان كوكي الـ refresh تتبعت عبر الـ origins
 
 // ─────────── Authorization ───────────
 builder.Services.AddSingleton<IAuthorizationHandler, AdminRequirementHandler>();

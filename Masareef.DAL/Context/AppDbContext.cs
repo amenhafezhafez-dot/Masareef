@@ -34,6 +34,8 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<ProductSale> ProductSales { get; set; }
 
+    public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
+
     public virtual DbSet<VwDebtSummary> VwDebtSummaries { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -134,6 +136,17 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<VwDebtSummary>(entity =>
         {
             entity.ToView("vw_DebtSummary");
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");
+            entity.HasIndex(e => e.TokenHash).HasDatabaseName("IX_RefreshTokens_TokenHash");
+            entity.HasIndex(e => e.UserId).HasDatabaseName("IX_RefreshTokens_UserID");
+
+            entity.HasOne(d => d.User).WithMany()
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("FK_RefreshTokens_Users");
         });
 
 

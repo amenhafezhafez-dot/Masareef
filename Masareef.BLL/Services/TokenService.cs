@@ -1,5 +1,6 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using Masareef.Entities.Models;
 using Microsoft.Extensions.Configuration;
@@ -36,7 +37,7 @@ public class TokenService
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
-        int minutes = int.TryParse(jwt["ExpiryMinutes"], out var m) ? m : 120;
+        int minutes = int.TryParse(jwt["ExpiryMinutes"], out var m) ? m : 30;
         var expiresAt = DateTime.UtcNow.AddMinutes(minutes);
 
         var token = new JwtSecurityToken(
@@ -50,4 +51,16 @@ public class TokenService
 
         return (tokenString, expiresAt);
     }
+
+
+    /// <summary>بيولّد Refresh Token عشوائي وآمن (256-bit) — ده اللي بيتبعت للكلاينت في الكوكي</summary>
+    public string GenerateRefreshToken() =>
+        Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+
+    /// <summary>بنخزن الـ hash بس في الداتابيز، مش التوكن الخام — لو الداتابيز اتسرقت التوكنات تفضل غير قابلة للاستخدام</summary>
+    public string HashRefreshToken(string rawToken) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawToken)));
+
+    public int RefreshTokenExpiryDays =>
+        int.TryParse(_config.GetSection("Jwt")["RefreshTokenExpiryDays"], out var d) ? d : 7;
 }
