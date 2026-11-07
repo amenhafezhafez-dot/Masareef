@@ -1,11 +1,13 @@
 using Masareef.BusinessLayer.Services;
 using Masareef.Entities.DTOs;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Masareef.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
+[EnableRateLimiting("auth")]      // 🔒 حماية من brute force على كل endpoints الـ auth
 public class AuthController : ControllerBase
 {
     private const string RefreshCookieName = "refreshToken";

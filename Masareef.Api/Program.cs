@@ -4,6 +4,8 @@ using Masareef.DAL.Repository;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;          // ← جديد
 using Microsoft.AspNetCore.Authorization;                      // ← جديد
+using Microsoft.AspNetCore.RateLimiting;                       // ← جديد
+using System.Threading.RateLimiting;                           // ← جديد
 using Masareef.Api.Authorization;                              // ← جديد
 using Microsoft.IdentityModel.Tokens;                          // ← جديد
 using System.Text;                                             // ← جديد
@@ -74,6 +76,22 @@ builder.Services.AddAuthorization(options =>
         policy.Requirements.Add(new OwnershipRequirement()));
 });
 
+// ─────────── Rate limiting ───────────
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddPolicy("auth", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,                      // 5 محاولات بس
+                Window = TimeSpan.FromMinutes(1),      // كل دقيقة
+                QueueLimit = 0                         // مفيش انتظار في الطابور — يترفض فورًا
+            }));
+});
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
@@ -122,6 +140,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("spa");
 app.UseAuthentication();      // ← جديد — لازم قبل UseAuthorization
+app.UseRateLimiter();         // ← جديد
 app.UseAuthorization();       // ← جديد
 app.MapControllers();
 app.Run();
