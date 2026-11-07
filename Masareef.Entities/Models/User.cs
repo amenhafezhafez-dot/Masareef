@@ -25,9 +25,15 @@ public partial class User
     [StringLength(20)]
     public string? PhoneNumber { get; set; }
 
+    [StringLength(20)]
+    public string Role { get; set; } = "User";
+
     public DateTime CreatedAt { get; set; }
 
     public bool IsActive { get; set; }
+
+
+
 
     [InverseProperty("User")]
     public virtual ICollection<Business> Businesses { get; set; } = new List<Business>();

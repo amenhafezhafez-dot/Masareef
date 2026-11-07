@@ -43,6 +43,7 @@ public class AuthService
             Email = dto.Email.Trim().ToLowerInvariant(),
             PasswordHash = hash,
             PhoneNumber = dto.PhoneNumber?.Trim(),
+            Role = Roles.User,               // 🔒 التسجيل العادي دايماً User — مفيش Admin من الـ API
             IsActive = true,
             CreatedAt = DateTime.UtcNow
         };
@@ -86,6 +87,7 @@ public class AuthService
             UserId = user.UserId,
             Name = user.Name,
             Email = user.Email,
+            Role = user.Role,
             ExpiresAt = expiresAt
         };
     }

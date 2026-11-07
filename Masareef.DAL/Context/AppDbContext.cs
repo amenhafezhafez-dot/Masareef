@@ -128,6 +128,7 @@ public partial class AppDbContext : DbContext
         {
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");
             entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.Role).HasDefaultValue("User");
         });
 
         modelBuilder.Entity<VwDebtSummary>(entity =>

@@ -3,6 +3,8 @@ using Masareef.DAL.Context;
 using Masareef.DAL.Repository;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;          // ← جديد
+using Microsoft.AspNetCore.Authorization;                      // ← جديد
+using Masareef.Api.Authorization;                              // ← جديد
 using Microsoft.IdentityModel.Tokens;                          // ← جديد
 using System.Text;                                             // ← جديد
 
@@ -56,6 +58,15 @@ builder.Services.AddCors(o => o.AddPolicy("spa", p => p
     .WithOrigins(builder.Configuration["Cors:Origins"]!.Split(','))
     .AllowAnyHeader()
     .AllowAnyMethod()));
+
+// ─────────── Authorization ───────────
+builder.Services.AddSingleton<IAuthorizationHandler, AdminRequirementHandler>();
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy =>
+        policy.Requirements.Add(new AdminRequirement()));
+});
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
