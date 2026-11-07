@@ -1,14 +1,15 @@
-﻿using System;
+﻿using Masareef.Entities.Common;
+using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using Microsoft.EntityFrameworkCore;
 
 namespace Masareef.Entities.Models;
 
 [Index("UserId", "ExpenseDate", Name = "IX_HomeExpenses_Date")]
 [Index("UserId", Name = "IX_HomeExpenses_UserID")]
-public partial class HomeExpense
+public partial class HomeExpense : IUserOwned
 {
     [Key]
     [Column("HomeExpenseID")]

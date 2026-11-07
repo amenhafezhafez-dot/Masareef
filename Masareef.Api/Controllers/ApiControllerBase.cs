@@ -1,12 +1,12 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;        // ← جديد
-using System.Security.Claims;                     // ← جديد
+using Microsoft.AspNetCore.Authorization;        
+using System.Security.Claims;                    
 using Masareef.Entities.Common;
 
 namespace Masareef.Api.Controllers;
 
 [ApiController]
-[Authorize]                                       // ← جديد — كل الكونترولرز محتاجة توكن
+[Authorize]                                       
 public abstract class ApiControllerBase : ControllerBase
 {
     /// <summary>الـ UserId من التوكن بدل الرقم الثابت</summary>

@@ -1,15 +1,16 @@
-﻿using System;
+﻿using Masareef.Entities.Common;
+using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using Microsoft.EntityFrameworkCore;
 
 namespace Masareef.Entities.Models;
 
 [Index("BusinessId", Name = "IX_Debts_BusinessID")]
 [Index("UserId", "Status", Name = "IX_Debts_Status")]
 [Index("UserId", Name = "IX_Debts_UserID")]
-public partial class Debt
+public partial class Debt : IUserOwned
 {
     [Key]
     [Column("DebtID")]

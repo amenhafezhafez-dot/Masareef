@@ -2,12 +2,13 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Masareef.Entities.Common;
 using Microsoft.EntityFrameworkCore;
 
 namespace Masareef.Entities.Models;
 
 [Index("UserId", Name = "IX_Businesses_UserID")]
-public partial class Business
+public partial class Business : IUserOwned
 {
     [Key]
     [Column("BusinessID")]
